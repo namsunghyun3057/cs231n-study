@@ -1,0 +1,143 @@
+[CS231N | Spring 2025 | Lecture 8: Attention and Transformers]
+https://youtu.be/RQowiOF_FvQ?si=EuXdmVzDcyedDITz
+
+# 8. Attention and Transformers
+
+## 1. Sequence to Sequence with RNNs & Attention
+
+### 1-1. Sequence to Sequence (Seq2Seq)의 한계
+  : 기존 RNN 기반의 번역 모델(Machine Translation) 등에서 발생하는 정보 병목 현상.
+
+* **구조:** Encoder RNN이 입력 시퀀스를 처리하여 하나의 고정된 크기의 벡터(Context Vector, $c$)로 압축하면, Decoder RNN이 이를 바탕으로 출력 시퀀스를 생성,.
+
+* **문제점:** 입력 시퀀스의 길이가 매우 길어질 경우(예: 긴 문단, 책 한 권), 모든 정보를 하나의 고정된 벡터에 압축하는 것이 불가능해짐. 이를 **병목(Bottleneck)** 현상이라고 함,.
+
+### 1-2. Attention Mechanism (어텐션 메커니즘)
+
+: 디코더가 출력을 생성할 때마다 입력 시퀀스 전체를 다시 참고하여, 현재 시점에 필요한 정보에 집중(Attend)하게 만드는 기법.
+
+#### 1-2-1. 작동 원리
+
+1. **Alignment Scores 계산:** 디코더의 현재 상태($s_{t-1}$)와 인코더의 모든 은닉 상태($h_i$) 간의 유사도를 계산 (초기에는 Linear Layer 사용),.
+
+2. **Softmax:** 유사도 점수를 확률 분포로 변환하여 **Attention Weights**($a_{t,i}$) 생성. (총합은 1),.
+
+3. **Context Vector 생성:** 인코더의 은닉 상태들을 Attention Weights로 가중합(Weighted Sum)하여 동적인 Context Vector($c_t$) 생성.
+    * $c_t = \sum a_{t,i} h_i$,.
+
+4. **출력 생성:** 생성된 $c_t$를 디코더의 입력으로 사용하여 다음 단어 예측.
+
+* **효과:** 입력 시퀀스가 아무리 길어도 병목 현상이 발생하지 않으며, 모델이 스스로 어떤 단어와 어떤 단어가 연관되어 있는지(Alignment) 학습하게 됨.
+
+* **해석 가능성(Interpretability):** Attention Map을 시각화하면 모델이 번역 시 어떤 단어를 보고 있는지 알 수 있음 (예: 영어-프랑스어 어순 차이를 스스로 파악).
+
+## 2. Generalizing Attention (어텐션의 일반화)
+  : RNN의 보조 도구가 아니라, 그 자체로 강력한 연산 장치(Primitive)로서의 Attention 정의.
+
+### 2-1. Key, Query, Value
+  : 어텐션 연산을 데이터베이스 검색(Retrieval) 개념으로 일반화.
+
+* **Query ($Q$):** 현재 내가 찾고자 하는 정보 (예: 디코더의 은닉 상태).
+
+* **Key ($K$):** 검색 대상이 되는 데이터의 인덱스/라벨 (예: 인코더 은닉 상태).
+
+* **Value ($V$):** 실제 가져오고 싶은 정보 내용 (예: 인코더 은닉 상태).
+
+* **핵심:** 입력 벡터 $X$로부터 학습 가능한 가중치 행렬 $W_Q, W_K, W_V$를 통해 각각 $Q, K, V$를 생성함.
+
+### 2-2. Scaled Dot-Product Attention
+  : 내적(Dot Product)을 기반으로 유사도를 구하되, 벡터 차원 크기에 따른 기울기 소실 문제를 방지하기 위해 스케일링을 추가한 방식.
+
+#### 2-2-1. 수식 및 과정
+
+1. **Similarity:** $E = QK^T$ (모든 Query와 Key 간의 내적 계산).
+
+2. **Scaling:** $\sqrt{D_Q}$ (Query 차원의 제곱근)로 나누어줌.
+    * 이유: 차원($D$)이 커지면 내적 값도 커져서 Softmax 통과 시 기울기(Gradient)가 사라지는(Saturate) 현상이 발생하므로 이를 방지.
+
+3. **Attention Weights:** $A = \text{softmax}(E / \sqrt{D_Q})$.
+
+4. **Output:** $Y = AV$ (가중치 $A$를 이용해 Value들의 가중합 계산).
+
+* **행렬 연산의 효율성:** 이 모든 과정은 **4번의 행렬 곱(Matrix Multiplication)**으로 한 번에 병렬 처리가 가능하여 GPU 연산에 매우 효율적임.
+
+## 3. Self-Attention (셀프 어텐션)
+
+### 3-1. 개념
+  : 서로 다른 두 시퀀스(예: 영어, 프랑스어) 간의 어텐션(Cross-Attention)이 아니라, **하나의 시퀀스 내에서** 구성 요소들끼리 서로 참조하는 방식.
+
+* 입력 벡터 집합 $X$가 스스로 $Q, K, V$를 모두 생성.
+
+* 입력된 모든 벡터가 서로를 바라보며(All-to-All Comparison) 문맥 정보를 파악함.
+
+### 3-2. 특징
+
+* **Permutation Equivariant:** 입력 순서가 바뀌면 출력 순서도 똑같이 바뀜. 즉, 연산 자체는 순서 정보를 모름(Set of vectors).
+
+* **Positional Encoding:** 순서 정보가 중요한 언어 처리 등을 위해, 벡터에 위치 정보를 담은 값(Positional Embedding)을 더해줌으로써 순서 개념을 주입,.
+
+### 3-3. Masked Self-Attention
+  : 언어 모델(Language Modeling)처럼 다음 단어를 예측해야 하는 경우, 미래의 단어(Future tokens)를 미리 보면 안 됨.
+
+* **방법:** Attention Score 행렬에서 미래에 해당하는 위치에 $-\infty$ 값을 넣어 Softmax 결과가 0이 되도록 마스킹(Masking) 처리.
+
+### 3-4. Multi-Head Attention
+  : 어텐션을 한 번만 수행하는 것이 아니라, 여러 개의 헤드(Head)로 나누어 병렬로 수행,.
+
+* **이유:** 모델이 입력 데이터의 다양한 측면(예: 문법적 관계, 의미적 관계 등)을 동시에 학습할 수 있도록 용량(Capacity)을 늘려줌.
+
+* 각 헤드는 서로 다른 $W_Q, W_K, W_V$ 가중치를 가짐.
+
+* 마지막에 모든 헤드의 출력을 이어 붙여(Concat) 선형 변환(Linear Projection)을 거침.
+
+### 3-5. 복잡도 비교 (vs RNN, CNN)
+
+* **RNN:** 순차적 처리로 인해 병렬화 불가능. 긴 시퀀스 처리에 취약,.
+
+* **CNN:** 병렬화 가능하지만, 멀리 떨어진 정보(Long-range dependency)를 파악하려면 층을 깊게 쌓아야 함,.
+
+* **Self-Attention:**
+    * **장점:** 병렬화가 완벽하게 가능하며, 한 번의 연산으로 시퀀스 내 모든 요소 간의 관계를 파악 가능 (Long-range interaction $O(1)$),.
+    * **단점:** 시퀀스 길이 $N$에 대해 메모리와 계산량이 **$O(N^2)$**로 증가. (하지만 FlashAttention 등의 최적화로 완화됨),.
+
+## 4. The Transformer
+  : "Attention is All You Need" (Vaswani et al., 2017) 논문에서 제안된 아키텍처로, RNN이나 CNN 없이 오직 Attention만으로 구성된 모델,.
+
+### 4-1. Transformer Block 구조
+
+하나의 블록은 다음과 같은 순서로 구성되며, 이 블록을 여러 개(예: 12개, 96개) 쌓아서 모델을 만듦.
+
+1. **Input Embeddings (+ Positional Encoding)**
+
+2. **Multi-Head Self-Attention**
+    * Residual Connection (Add)
+    * Layer Normalization (Norm)
+
+3. **MLP (Multi-Layer Perceptron)**
+    * 각 벡터마다 독립적으로 적용되는 Feed-Forward Network.
+    * Residual Connection (Add)
+    * Layer Normalization (Norm)
+
+### 4-2. 활용 및 최신 동향
+
+* **LLM (Large Language Models):** GPT, BERT, Claude 등 현대의 모든 거대 언어 모델의 백본(Backbone) 아키텍처,.
+
+* **Vision Transformers (ViT):**
+    * 이미지를 작은 패치(Patch, 예: 16x16)로 잘라서 마치 단어(Token)처럼 취급,.
+    * 이를 Transformer에 넣어 이미지 분류 등의 태스크 수행.
+    * CNN의 귀납적 편향(Inductive Bias) 없이도 대규모 데이터로 학습하면 CNN보다 뛰어난 성능을 보임.
+
+### 4-3. 최신 아키텍처 변형 (Modern Tweaks)
+  : 2017년 이후 구조가 크게 바뀌진 않았으나 몇 가지 중요한 변화들이 있음.
+
+* **Pre-Norm:** Layer Norm을 Residual block 안쪽(입력 직후)으로 옮겨 학습 안정성 향상.
+
+* **RMSNorm:** Layer Norm 대신 평균(Mean)을 빼지 않고 스케일만 조정하는 RMSNorm 사용 (계산 효율성 및 안정성).
+
+* **SwiGLU:** 기존 ReLU 대신 Gated Linear Unit 계열 활성화 함수 사용.
+
+* **Mixture of Experts (MoE):**
+    * **개념:** 트랜스포머 블록 내의 MLP(Feed-Forward Network)를 하나만 쓰는 것이 아니라, **$E$개의 서로 다른 MLP(Experts, 전문가)**를 학습시킴.
+    * **작동 방식 (Routing):** 각 토큰을 처리할 때 모든 전문가를 다 쓰는 것이 아니라, 라우터(Router)가 선정한 일부(예: $A < E$) 전문가에게만 보냄.
+    * **장점:** 전체 파라미터 수는 $E$배로 엄청나게 늘릴 수 있지만(Capacity 증가), 실제 연산량(Compute)은 선택된 $A$개의 전문가만큼만 들기 때문에 효율적임.
+    * **현황:** GPT-4, Gemini, Claude 등 최신 초대형 모델들은 대부분 이 방식을 사용하여 1조 개(1T) 이상의 파라미터를 효율적으로 학습하고 있음.
