@@ -1,0 +1,238 @@
+[CS231N | Spring 2025 | Lecture 7 (2017 Lecture 10): Recurrent Neural Networks]
+
+https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 Link)
+
+# 10. Recurrent Neural Networks
+
+*(참고: 이 정리는 2017년 Lecture 10을 기본으로, 2025년 Lecture 7의 최신 내용을 추가하여 구성되었습니다.)*
+
+## 1. Sequence Modeling
+
+: 기존 Vanilla Neural Network는 고정된 크기의 입력과 고정된 크기의 출력만 처리 가능. 하지만 현실의 많은 문제는 가변 길이의 시퀀스 처리가 필요함.
+
+![image.png](/images/ch10/ch10_01.png)
+
+### 1-1. 다양한 입력/출력 형태
+
+1. **One to One:** 기존의 Vanilla Neural Network (예: 고정 크기 이미지 분류).
+
+2. **One to Many:** 고정 입력 -> 가변 출력 (예: **Image Captioning** - 이미지 한 장을 입력받아 문장(단어들의 시퀀스)을 출력).
+
+3. **Many to One:** 가변 입력 -> 고정 출력 (예: **Video Classification** - 비디오 프레임 시퀀스를 입력받아 행동 분류, **Sentiment Analysis** - 문장을 입력받아 감정 분류).
+
+4. **Many to Many:** 가변 입력 -> 가변 출력.
+    * 입력과 출력이 동기화되지 않는 경우 (예: **Machine Translation** - 영어 문장을 다 듣고 프랑스어 번역 출력).
+    * 입력과 출력이 동기화되는 경우 (예: **Video Classification on frame level** - 매 프레임마다 분류).
+
+## 2. Recurrent Neural Networks (RNN)
+
+### 2-1. 기본 구조 및 원리
+
+: 시퀀스를 처리하기 위해 **'내부 상태(Hidden State, $h$)'**를 가지는 신경망.
+
+![image.png](/images/ch10/ch10_02.png)
+
+* **핵심 아이디어:** 매 타임 스텝($t$)마다 새로운 입력($x_t$)과 이전 타임 스텝의 hidden state($h_{t-1}$)를 받아서 현재의 hidden state($h_t$)를 갱신함.
+
+* 이 과정이 반복되므로(Recurrent), 모든 타임 스텝에서 **동일한 가중치 파라미터($W$)를 공유**함.
+
+#### 2-1-1. 수식 표현
+
+* **Hidden State Update:**
+    $h_t = f_W(h_{t-1}, x_t)$
+
+    * $h_t$: 새로운 hidden state
+    * $h_{t-1}$: 이전 hidden state
+    * $x_t$: 현재 시점의 입력 벡터
+    * $f_W$: 파라미터 $W$를 가진 함수
+
+* **Vanilla RNN (Elman RNN):**
+    $h_t = \tanh(W_{hh}h_{t-1} + W_{xh}x_t)$
+    $y_t = W_{hy}h_t$
+
+    * 활성화 함수로 주로 **tanh**를 사용.
+    * $W_{hh}$: Hidden state 간의 변환 가중치.
+    * $W_{xh}$: 입력($x$)을 hidden state로 변환하는 가중치.
+    * $W_{hy}$: Hidden state를 출력($y$)으로 변환하는 가중치.
+
+### 2-2. (25년도) 수동 가중치 설정 예시 (Toy Example)
+
+: **(25년도)** 강의에서는 RNN의 작동 원리를 명확히 하기 위해, 학습(Gradient Descent)이 아닌 수동으로 가중치를 설정하여 특정 작업을 수행하는 예시를 듦.
+
+* **목표:** 0과 1로 이루어진 시퀀스에서, "1이 두 번 연속 나오면" 1을 출력하고, 아니면 0을 출력.
+    * Input sequence: 0 1 0 1 1 1 0 1 1
+    * Output sequence: 0 0 0 0 1 1 0 0 1
+
+* **Hidden State 구성:** 현재 값(Current)과 이전 값(Previous)을 기억해야 함. 편의상 Bias 처리를 위해 1을 추가하여 3차원 벡터로 구성.
+    * $h_t = [\text{Current}, \text{Previous}, 1]^T$
+
+* **가중치 설정:**
+    * $W_{xh}$: 입력 $x$를 받아 Hidden state의 'Current' 슬롯에 넣음.
+    * $W_{hh}$: 이전 $h_{t-1}$의 'Current' 값을 현재 $h_t$의 'Previous' 슬롯으로 옮김 (Shift).
+    * 이를 통해 모델은 연속된 입력을 추적하고, 마지막 Output Layer($W_{hy}$)에서 두 값이 모두 1일 때만 1을 출력하도록(AND 연산과 유사) 설정 가능.
+
+## 3. Computational Graph & Backpropagation
+
+### 3-1. Backpropagation Through Time (BPTT)
+
+: RNN을 시간 순서대로 펼쳐(Unroll) 놓은 뒤, 전체 시퀀스를 통과하며 Loss를 계산하고 역전파를 수행하는 방식.
+
+* **동일한 가중치($W$) 공유:** 모든 타임 스텝에서 같은 $W$를 사용하므로, 역전파 시 각 타임 스텝에서 계산된 $W$에 대한 그래디언트를 **모두 더해줌(Sum)**.
+
+* **문제점:** 시퀀스가 매우 길 경우(예: 위키피디아 전체 텍스트), 전체 시퀀스에 대한 그래디언트를 계산하려면 메모리가 부족하고 계산 비용이 너무 큼.
+
+### 3-2. Truncated BPTT
+
+: 긴 시퀀스를 작은 덩어리(Chunk)로 잘라서 학습하는 실용적인 방법.
+
+![image.png](/images/ch10/ch10_03.png)
+
+1. 일정 길이(예: 100 step)만큼 순전파(Forward)를 진행하여 Loss 계산.
+
+2. 해당 구간에 대해서만 역전파(Backward) 수행하여 가중치 업데이트.
+
+3. **핵심:** Hidden state 값은 다음 덩어리로 전달하되, **(25년도)** 그래디언트의 흐름은 끊음(Detach). 즉, 이전 덩어리로 역전파가 넘어가지 않음.
+
+4. **(25년도)** 메모리 효율성: 이렇게 하면 GPU 메모리에는 현재 처리 중인 덩어리(Chunk)의 정보만 유지하면 되므로 매우 긴 시퀀스도 학습 가능.
+
+## 4. RNN Applications
+
+### 4-1. Character-level Language Model
+
+: 문자(Character) 단위로 다음 글자를 예측하도록 학습하는 모델.
+
+* **One-hot Encoding:** 각 문자를 벡터로 표현 (예: h=, e= ...).
+    * **(25년도)** 실제로는 One-hot 대신 **Embedding Layer**를 사용하여 더 효율적으로 학습. 행렬 곱셈 대신 Lookup Table 방식 사용.
+
+* **작동 방식:**
+    1. 입력 'h' -> $h_1$ 계산 -> 출력 'e' 예측 (Loss 계산).
+    2. 입력 'e' -> $h_2$ 계산($h_1$ 참조) -> 출력 'l' 예측.
+    3. 반복...
+
+* **Test Time (Sampling):** 모델이 예측한 확률분포(Softmax)에서 문자를 하나 **샘플링(Sampling)**하고, 그 문자를 다음 타임 스텝의 입력으로 다시 넣어주는 방식으로 텍스트 생성.
+    * **(25년도)** 항상 확률이 가장 높은 글자만 선택(Greedy)하면 매번 똑같은 문장이 나오므로, 확률 분포에 따라 샘플링하여 다양성(Diversity)을 확보함.
+
+* **결과:** 셰익스피어 희곡, 리눅스 커널 코드(C언어), 라텍(Latex) 수식 등을 학습시키면 구조적으로 그럴싸한 텍스트를 생성해냄.
+    * **(25년도)** 현재의 거대 언어 모델(LLM, 예: Copilot, GPT)들도 기본적으로는 "다음 토큰을 예측"하는 동일한 원리로 작동함.
+
+### 4-2. Image Captioning
+
+: CNN과 RNN을 결합한 모델.
+
+![image.png](/images/ch10/ch10_04.png)
+
+* **Encoder (CNN):** 이미지를 입력받아 특징 벡터(Vector)를 추출 (주로 ImageNet으로 사전 학습된 모델의 FC layer 직전 feature map 사용).
+
+* **Decoder (RNN):** CNN이 추출한 벡터를 초기 hidden state($h_0$) 혹은 첫 입력으로 사용하여 문장 생성.
+    * `<START>` 토큰으로 시작해서 `<END>` 토큰이 나올 때까지 단어 생성.
+
+* **(25년도) 한계점:** 데이터셋의 편향(Bias)을 그대로 학습함.
+    * 예) 실내에 있는 둥근 물체를 무조건 '마우스'라고 하거나, 해변에 있는 사람을 보면 서핑 보드가 없어도 '서핑 보드를 들고 있다'고 잘못 예측(Hallucination)하는 경우가 빈번함.
+
+### 4-3. Visual Question Answering (VQA)
+
+: 이미지와 질문(텍스트)을 입력받아 정답을 출력하는 태스크.
+* RNN으로 질문을 인코딩하고 CNN으로 이미지를 인코딩하여 결합(Concatenate 등)한 뒤 정답 분류.
+
+### 4-4. (25년도) Visual Dialog & Navigation
+
+: **(25년도)** 추가된 응용 사례.
+* **Visual Dialog:** 이미지에 대해 챗봇과 대화하듯이 연속적인 질문과 답변을 주고받음.
+* **Visual Navigation:** 시각 정보를 바탕으로 에이전트가 목적지까지 이동하도록 방향(Action 시퀀스)을 생성.
+
+## 5. Interpretability & Issues
+
+### 5-1. RNN의 해석 가능성 (Interpretability)
+
+: 학습된 RNN의 Hidden state 중 특정 차원(neuron)이 무엇을 학습했는지 시각화해보면 흥미로운 결과가 나옴. (Karpathy et al., 2015)
+
+* **Quote Detection Cell:** 따옴표(" ")가 열리고 닫힐 때까지 활성화되는 셀.
+* **Line Length Tracking Cell:** 줄 바꿈이 일어날 시점을 예측하기 위해 현재 줄의 길이를 추적하는 셀.
+* **If Statement Cell:** 코드에서 if 문 조건을 처리하는 동안 활성화되는 셀.
+* **Code Depth Cell:** 코드의 들여쓰기(indentation) 깊이에 따라 활성도가 달라지는 셀.
+
+-> 별도의 감독(Supervision) 없이도 모델이 데이터의 구조를 파악하기 위해 스스로 이런 기능을 학습함!
+
+### 5-2. Vanishing & Exploding Gradients
+
+: Vanilla RNN은 역전파 시 $W_{hh}$ 행렬이 계속해서 곱해지는 구조.
+
+#### 5-2-1. Exploding Gradients (기울기 폭발)
+
+* **원인:** $W_{hh}$의 가장 큰 특이값(Singular Value)이 1보다 클 때 발생. 역전파 과정에서 그래디언트가 기하급수적으로 커짐.
+* **해결책:** **Gradient Clipping**. 그래디언트의 L2 Norm이 임계값(Threshold)을 넘으면 잘라냄(Scale down).
+
+```jsx
+grad_norm = np.sum(grad * grad)
+if grad_norm > threshold:
+    grad *= (threshold / grad_norm)
+```
+
+#### 5-2-2. Vanishing Gradients (기울기 소실)
+
+* **원인:**
+    1. **tanh 함수:** 미분값이 항상 1보다 작음 (양 끝에서는 0에 수렴).
+    2. **행렬 곱:** $W_{hh}$의 특이값이 1보다 작으면 계속 곱해지면서 그래디언트가 0으로 수렴.
+* **결과:** 먼 과거의 정보(Long-term dependencies)가 현재까지 전달되지 못하고 사라짐.
+* **해결책:** 아키텍처를 변경해야 함 -> **LSTM, GRU** 등 등장.
+
+## 6. LSTM (Long Short Term Memory)
+
+: Vanilla RNN의 기울기 소실 문제를 해결하기 위해 고안된 구조 (Hochreiter & Schmidhuber, 1997).
+
+![image.png](/images/ch10/ch10_05.png)
+
+### 6-1. 핵심 구조: Cell State ($c_t$)
+
+* RNN의 hidden state($h_t$) 외에 **Cell state($c_t$)**라는 별도의 경로를 둠.
+* 정보가 큰 방해 없이 흘러갈 수 있는 "고속도로(Highway)" 역할을 하여 기울기 소실을 막음. **(25년도)** ResNet의 Skip Connection과 개념적으로 매우 유사함.
+
+### 6-2. 4개의 게이트 (Gates)
+
+: 시그모이드($\sigma$) 함수를 통해 0~1 사이의 값을 출력하여 정보의 흐름을 제어.
+
+1. **$i$ (Input gate):** Cell state에 얼마나 새로운 정보를 쓸지 결정.
+2. **$f$ (Forget gate):** 과거의 Cell state 정보를 얼마나 잊을지 결정.
+3. **$o$ (Output gate):** 현재 Cell state를 바탕으로 Hidden state($h_t$)를 얼마나 출력할지 결정.
+4. **$g$ (Gate gate):** Cell에 더해질 새로운 정보의 후보군 (tanh 사용).
+
+```jsx
+# LSTM 수식 개요
+i = sigmoid(Wx_i * x + Wh_i * h)
+f = sigmoid(Wx_f * x + Wh_f * h)
+o = sigmoid(Wx_o * x + Wh_o * h)
+g = tanh(Wx_g * x + Wh_g * h)
+
+c_t = f * c_{t-1} + i * g  # 핵심: 곱하기가 아닌 더하기(+) 연산 포함!
+h_t = o * tanh(c_t)
+```
+
+### 6-3. Gradient Flow in LSTM
+
+* **Additive Interaction:** Cell state 업데이트 식인 $c_t = f \odot c_{t-1} + i \odot g$ 에서 `+` 연산이 존재.
+* **Gradient Super Highway:** 역전파 시 `+` 연산은 그래디언트를 그대로 전달(Distribute)하고, $f$(forget gate)를 곱하는 연산은 행렬 곱이 아닌 요소별 곱(Element-wise multiplication)이므로 Vanilla RNN보다 그래디언트 소실에 훨씬 강함.
+* **(25년도)** 완벽한 해결책은 아니지만, Vanilla RNN보다 장기 의존성(Long-term dependency) 학습이 훨씬 수월함.
+
+## 7. Multilayer RNNs
+
+: CNN처럼 RNN도 층을 쌓을 수 있음.
+* 보통 2~4층 정도를 사용하며, 그 이상 깊게 쌓는 경우는 드묾 (CNN은 수백 층도 쌓음).
+* **(25년도)** 시간 축(Time)으로도 깊고, 깊이(Depth) 축으로도 깊은 구조가 형성됨.
+
+## 8. (25년도) Modern Trends: State Space Models
+
+*(2017년 강의에는 없던 최신 동향)*
+
+### 8-1. RNN의 재조명
+
+: Transformer가 등장한 이후 RNN이 주춤했으나, 최근 다시 주목받고 있음.
+
+* **Transformer의 단점:** 입력 시퀀스 길이($N$)의 제곱($N^2$)에 비례하는 계산량이 필요하며, Context Length에 제한이 있음.
+* **RNN의 장점:**
+    1. **Unlimited Context Length:** 이론상 무한한 길이의 시퀀스를 처리 가능.
+    2. **Linear Compute:** 시퀀스 길이에 대해 계산량이 선형적으로 증가.
+
+### 8-2. 최신 모델 (Mamba, RWKV)
+
+* **State Space Models (SSM):** RNN의 장점(선형 복잡도, 빠른 추론)과 Transformer의 장점(병렬 학습, 높은 성능)을 결합하려는 시도.
+* **Mamba, RWKV:** 최근 연구들로, Transformer와 대등한 성능을 보이면서도 긴 시퀀스 처리에 효율적인 새로운 아키텍처들임.
