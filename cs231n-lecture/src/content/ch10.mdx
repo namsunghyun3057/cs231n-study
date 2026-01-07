@@ -10,9 +10,11 @@ https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 
 
 : 기존 Vanilla Neural Network는 고정된 크기의 입력과 고정된 크기의 출력만 처리 가능. 하지만 현실의 많은 문제는 가변 길이의 시퀀스 처리가 필요함.
 
-![image.png](/images/ch10/ch10_01.png)
+![10-1](/images/ch10/ch10_01.png)
 
 ### 1-1. 다양한 입력/출력 형태
+
+![10-2](/images/ch10/ch10_02.png)
 
 1. **One to One:** 기존의 Vanilla Neural Network (예: 고정 크기 이미지 분류).
 
@@ -28,15 +30,17 @@ https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 
 
 ### 2-1. 기본 구조 및 원리
 
-: 시퀀스를 처리하기 위해 **'내부 상태(Hidden State, $h$)'**를 가지는 신경망.
+: 시퀀스를 처리하기 위해 '내부 상태(Hidden State, $h$)'를 가지는 신경망.
 
-![image.png](/images/ch10/ch10_02.png)
+![10-3](/images/ch10/ch10_03.png)
 
 * **핵심 아이디어:** 매 타임 스텝($t$)마다 새로운 입력($x_t$)과 이전 타임 스텝의 hidden state($h_{t-1}$)를 받아서 현재의 hidden state($h_t$)를 갱신함.
 
 * 이 과정이 반복되므로(Recurrent), 모든 타임 스텝에서 **동일한 가중치 파라미터($W$)를 공유**함.
 
 #### 2-1-1. 수식 표현
+
+![10-4](/images/ch10/ch10_04.png)
 
 * **Hidden State Update:**
     $h_t = f_W(h_{t-1}, x_t)$
@@ -45,6 +49,8 @@ https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 
     * $h_{t-1}$: 이전 hidden state
     * $x_t$: 현재 시점의 입력 벡터
     * $f_W$: 파라미터 $W$를 가진 함수
+
+![10-5](/images/ch10/ch10_05.png)
 
 * **Vanilla RNN (Elman RNN):**
     $h_t = \tanh(W_{hh}h_{t-1} + W_{xh}x_t)$
@@ -58,6 +64,8 @@ https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 
 ### 2-2. (25년도) 수동 가중치 설정 예시 (Toy Example)
 
 : **(25년도)** 강의에서는 RNN의 작동 원리를 명확히 하기 위해, 학습(Gradient Descent)이 아닌 수동으로 가중치를 설정하여 특정 작업을 수행하는 예시를 듦.
+
+![10-6](/images/ch10/ch10_06.png)
 
 * **목표:** 0과 1로 이루어진 시퀀스에서, "1이 두 번 연속 나오면" 1을 출력하고, 아니면 0을 출력.
     * Input sequence: 0 1 0 1 1 1 0 1 1
@@ -85,7 +93,7 @@ https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 
 
 : 긴 시퀀스를 작은 덩어리(Chunk)로 잘라서 학습하는 실용적인 방법.
 
-![image.png](/images/ch10/ch10_03.png)
+![10-7](/images/ch10/ch10_07.png)
 
 1. 일정 길이(예: 100 step)만큼 순전파(Forward)를 진행하여 Loss 계산.
 
@@ -109,7 +117,7 @@ https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 
     2. 입력 'e' -> $h_2$ 계산($h_1$ 참조) -> 출력 'l' 예측.
     3. 반복...
 
-* **Test Time (Sampling):** 모델이 예측한 확률분포(Softmax)에서 문자를 하나 **샘플링(Sampling)**하고, 그 문자를 다음 타임 스텝의 입력으로 다시 넣어주는 방식으로 텍스트 생성.
+* **Test Time (Sampling):** 모델이 예측한 확률분포(Softmax)에서 문자를 하나 샘플링(Sampling)하고, 그 문자를 다음 타임 스텝의 입력으로 다시 넣어주는 방식으로 텍스트 생성.
     * **(25년도)** 항상 확률이 가장 높은 글자만 선택(Greedy)하면 매번 똑같은 문장이 나오므로, 확률 분포에 따라 샘플링하여 다양성(Diversity)을 확보함.
 
 * **결과:** 셰익스피어 희곡, 리눅스 커널 코드(C언어), 라텍(Latex) 수식 등을 학습시키면 구조적으로 그럴싸한 텍스트를 생성해냄.
@@ -119,7 +127,7 @@ https://youtu.be/6niqTuYFZZk?si=1 (2017 Link) / https://youtu.be/new_link (2025 
 
 : CNN과 RNN을 결합한 모델.
 
-![image.png](/images/ch10/ch10_04.png)
+![10-8](/images/ch10/ch10_08.png)
 
 * **Encoder (CNN):** 이미지를 입력받아 특징 벡터(Vector)를 추출 (주로 ImageNet으로 사전 학습된 모델의 FC layer 직전 feature map 사용).
 
@@ -180,11 +188,11 @@ if grad_norm > threshold:
 
 : Vanilla RNN의 기울기 소실 문제를 해결하기 위해 고안된 구조 (Hochreiter & Schmidhuber, 1997).
 
-![image.png](/images/ch10/ch10_05.png)
+![10-9](/images/ch10/ch10_09.png)
 
 ### 6-1. 핵심 구조: Cell State ($c_t$)
 
-* RNN의 hidden state($h_t$) 외에 **Cell state($c_t$)**라는 별도의 경로를 둠.
+* RNN의 hidden state($h_t$) 외에 Cell state($c_t$)라는 별도의 경로를 둠.
 * 정보가 큰 방해 없이 흘러갈 수 있는 "고속도로(Highway)" 역할을 하여 기울기 소실을 막음. **(25년도)** ResNet의 Skip Connection과 개념적으로 매우 유사함.
 
 ### 6-2. 4개의 게이트 (Gates)
@@ -221,7 +229,7 @@ h_t = o * tanh(c_t)
 
 ## 8. (25년도) Modern Trends: State Space Models
 
-*(2017년 강의에는 없던 최신 동향)*
+![10-10](/images/ch10/ch10_10.png)
 
 ### 8-1. RNN의 재조명
 

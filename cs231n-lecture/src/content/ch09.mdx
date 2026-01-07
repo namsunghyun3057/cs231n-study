@@ -1,0 +1,137 @@
+[CS231N | Spring 2017 | Lecture 9: CNN Architectures]
+
+https://youtu.be/DAOcjicFr1Y
+
+# 9. CNN Architectures
+
+## 1. AlexNet
+
+: 2012년 ImageNet 챌린지 우승 모델. 최초의 대규모 CNN 아키텍처로, 딥러닝 부흥의 시발점이 된 모델.
+
+![image.png](/images/ch09/ch09_01.png)
+
+### 1-1. 구조적 특징
+
+*   **레이어 구성:** 5개의 컨볼루션 레이어(Convolution Layers)와 3개의 완전 연결 계층(Fully Connected Layers)으로 구성.
+*   **입력 크기:** $227 \times 227 \times 3$ 이미지 사용.
+
+### 1-2. 첫 번째 레이어 분석 (메모리 및 파라미터)
+
+: 강의에서는 첫 번째 레이어의 출력 크기와 파라미터 수를 계산하는 것이 중요하다고 강조.
+
+*   **설정:** $11 \times 11$ 필터 96개, Stride 4.
+*   **출력 크기 계산:**
+    $(227 - 11) / 4 + 1 = 55$
+    따라서 출력 볼륨은 **$55 \times 55 \times 96$**.
+*   **파라미터 수:**
+    $11 \times 11 \times 3 \text{ (입력 깊이)} \times 96 \text{ (필터 수)} \approx 35\text{K}$.
+
+### 1-3. 핵심 요소 및 역사적 맥락
+
+*   **ReLU 사용:** 최초로 ReLU 활성화 함수를 사용하여 수렴 속도를 높임.
+*   **데이터 증강(Data Augmentation):** Flipping, Jittering, Cropping, Color Normalization 등을 적극적으로 활용.
+*   **Dropout:** 과적합 방지를 위해 사용.
+*   **GPU 분산 처리:** 당시 GTX 580(3GB VRAM)의 용량 한계로 인해, 네트워크를 두 개의 GPU에 나누어 학습. 특정 레이어에서만 서로 통신하는 구조를 가짐.
+
+## 2. VGGNet
+
+: 2014년 ImageNet 챌린지 2위(Classification), 1위(Localization). **'더 깊은 네트워크(Deeper Networks)'**와 **'작은 필터(Small Filters)'**가 핵심 철학.
+
+![image.png](/images/ch09/ch09_02.png)
+
+### 2-1. 핵심 설계: 왜 3x3 필터인가?
+
+: VGGNet은 $3 \times 3$ 컨볼루션 필터만을 사용하여 깊게 쌓는 방식을 채택.
+
+1.  **유효 수용 영역(Effective Receptive Field):**
+    *   $3 \times 3$ 필터를 3번 쌓으면 ($3 \times 3$ -> $5 \times 5$ -> $7 \times 7$), 원본 입력에 대해 **$7 \times 7$ 영역**을 보는 것과 동일한 효과.
+
+2.  **비선형성 증가:**
+    *   $7 \times 7$ 필터를 한 번 쓰는 것보다, $3 \times 3$을 세 번 쓰면 활성화 함수(ReLU)를 세 번 거치게 되어 더 복잡한 특징을 학습할 수 있음.
+
+3.  **파라미터 효율성:**
+    *   입출력 채널이 $C$일 때:
+        *   $7 \times 7$ 레이어 1개: $49C^2$ 파라미터.
+        *   $3 \times 3$ 레이어 3개: $3 \times (9C^2) = 27C^2$ 파라미터.
+    *   따라서 더 적은 파라미터로 동일한 수용 영역을 가지며 더 깊은 층을 쌓을 수 있음.
+
+### 2-2. 특징
+
+*   **VGG16 / VGG19:** 각각 16개, 19개의 레이어(Weight layers)를 가짐.
+*   **메모리 사용량:** 초기 레이어에서 공간 해상도($224 \times 224$)가 크고 필터 수가 많아(64개), 이미지 한 장당 약 100MB의 메모리가 필요할 정도로 무거움.
+*   **파라미터 수:** 완전 연결 계층(FC Layers)으로 인해 총 1억 3천 8백만(138M) 개의 파라미터를 가짐 (AlexNet은 60M).
+
+## 3. GoogLeNet
+
+: 2014년 ImageNet 챌린지 우승 모델. **'효율성(Efficiency)'**에 초점을 맞춘 아키텍처.
+
+![image.png](/images/ch09/ch09_03.png)
+
+### 3-1. Inception Module (인셉션 모듈)
+
+: "네트워크 안의 네트워크(Network within a Network)" 개념을 도입한 로컬 토폴로지.
+
+*   **병렬 연산:** 입력을 받아 $1 \times 1$, $3 \times 3$, $5 \times 5$ 컨볼루션과 $3 \times 3$ 풀링 연산을 **병렬**로 수행.
+*   **Filter Concatenation:** 각 연산의 결과를 깊이(Depth) 방향으로 이어 붙여(Concatenate) 다음 층으로 전달.
+
+### 3-2. 병목 현상과 해결책 (Bottleneck Layers)
+
+*   **문제점:** 단순히 필터들을 병렬로 연결하면 깊이(Depth)가 기하급수적으로 늘어나 연산량이 폭발함.
+*   **해결책 ($1 \times 1$ Convolution):** 비싼 연산($3 \times 3$, $5 \times 5$)을 수행하기 전에 **$1 \times 1$ 컨볼루션**을 통과시켜 채널 수(Depth)를 줄임.
+    *   이를 통해 차원 축소(Dimensionality Reduction) 효과를 얻고 연산량을 획기적으로 줄임.
+    *   채널 수를 줄였다가 다시 늘리는 구조 때문에 **Bottleneck Layer**라고 부름.
+
+### 3-3. 구조적 특징
+
+*   **FC Layer 제거:** 파라미터가 가장 많은 완전 연결 계층을 없애고 **Global Average Pooling**을 사용.
+    *   결과적으로 AlexNet보다 훨씬 깊지만(22 layers), 파라미터 수는 12배 적은 5M(500만) 개에 불과함.
+*   **Auxiliary Classifiers (보조 분류기):** 네트워크 중간중간에 추가적인 분류기(Softmax)를 달아, 깊은 네트워크에서도 그래디언트가 앞쪽 레이어까지 잘 전달되도록 도움.
+
+## 4. ResNet (Residual Networks)
+
+: 2015년 ImageNet 우승 모델. 152층이라는 압도적인 깊이를 달성하며 딥러닝의 혁명을 일으킴.
+
+![image.png](/images/ch09/ch09_04.png)
+
+### 4-1. 문제 제기: 깊어질수록 성능이 떨어진다?
+
+*   일반적인 CNN(Plain Net)은 깊이가 깊어질수록 테스트 에러뿐만 아니라 **학습 에러(Training Error)**도 높아지는 현상이 발견됨.
+*   이는 과적합(Overfitting)이 아니라 **최적화(Optimization)**의 문제. 이론적으로 깊은 모델은 얕은 모델만큼의 성능은 나와야 함(Identity Mapping만 배워도 되므로).
+
+### 4-2. Residual Learning (잔차 학습)
+
+*   **핵심 아이디어:** $H(x)$를 직접 학습하는 대신, 잔차(Residual)인 $F(x) = H(x) - x$를 학습하도록 변경.
+    *   최종 출력: $H(x) = F(x) + x$
+*   **Skip Connection:** 입력을 출력에 바로 더해주는 지름길(Skip Connection)을 만듦.
+*   **효과:** 만약 Identity Mapping이 최적이라면, 네트워크는 $F(x)$를 0으로 만들기만 하면 됨. 복잡한 매핑을 처음부터 배우는 것보다 0(잔차)을 배우는 것이 훨씬 쉬움.
+*   이를 통해 152층, 심지어 1200층까지도 학습이 가능해짐.
+
+### 4-3. 아키텍처 상세
+
+*   모든 컨볼루션 레이어 뒤에 **Batch Normalization** 사용.
+*   GoogLeNet처럼 **Bottleneck** 구조 사용 (깊은 ResNet의 경우 $1 \times 1$로 차원을 줄이고 $3 \times 3$ 연산 후 다시 $1 \times 1$로 차원 확대).
+*   FC Layer 없음 (Global Average Pooling 사용).
+*   **초기화:** Xavier Initialization에 추가적인 스케일링 팩터를 적용.
+
+## 5. Other Architectures & Modern Trends
+
+강의 후반부에는 ResNet 이후의 연구들과 효율성을 강조한 모델들을 소개.
+
+### 5-1. Network in Network (NiN)
+
+: GoogLeNet과 ResNet의 선구자 격인 모델.
+*   각 컨볼루션 내에 작은 MLP(Micro Network)를 쌓는 개념 도입.
+*   Bottleneck Layer ($1 \times 1$ Conv)의 개념을 정립.
+
+### 5-2. ResNet 변형 모델들
+
+*   **Identity Mappings in Deep Residual Networks:** ResNet 블록 내부 구조를 개선하여 그래디언트 흐름을 더 좋게 만듦.
+*   **Wide ResNet:** 깊이(Depth)보다는 너비(Width, 필터 수)를 늘리는 것이 효율적이라는 주장. 병렬 처리가 용이함.
+*   **ResNeXt:** ResNet과 Inception의 결합. 그룹화된 컨볼루션(Grouped Convolution)을 사용하여 'Cardinality'라는 개념 도입.
+*   **Stochastic Depth:** 학습 시에는 레이어의 일부를 무작위로 제거(Drop)하여 짧은 네트워크로 학습하고, 테스트 시에는 전체를 사용. Dropout과 유사한 개념.
+
+### 5-3. Non-ResNet 및 효율적 모델
+
+*   **FractalNet:** 잔차 연결 없이도 깊은 네트워크 학습이 가능함을 보여줌. 프랙탈 구조 사용.
+*   **DenseNet (Densely Connected CNN):** 앞쪽의 모든 레이어의 출력을 뒤쪽 레이어의 입력으로 연결(Concatenate). Feature Reuse를 극대화하고 Vanishing Gradient 문제 완화.
+*   **SqueezeNet:** 효율성(Efficiency)에 집중. 'Fire Module'을 사용하여 AlexNet 수준의 성능을 내면서 파라미터 수는 50배 적음 (압축 시 500배까지 작아짐).
