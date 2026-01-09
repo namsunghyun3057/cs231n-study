@@ -1,4 +1,4 @@
-// File: C:\Users\namsu\project\GDGoC_Konkuk\스터디\DeepLearning\cs231n-study\cs231n-lecture\src\app\[slug]\page.tsx
+// File: D:\학교\동아리\GDGoC_Konkuk\deep-learning\cs231n-study\cs231n-lecture\src\app\[slug]\page.tsx
 import * as entry from '../../../../src/app/[slug]/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

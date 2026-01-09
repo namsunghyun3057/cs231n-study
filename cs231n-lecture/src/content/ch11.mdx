@@ -1,0 +1,133 @@
+[CS231N | Spring 2017 | Lecture 11: Detection and Segmentation]
+
+https://youtu.be/StartLinkHere
+
+# 11. Detection and Segmentation
+
+## 1. Semantic Segmentation (시맨틱 세그멘테이션)
+
+: 입력 이미지의 **모든 픽셀(pixel)**에 대해 카테고리 레이블을 결정하는 작업.
+
+![image.png](/images/ch11/ch11_01.png)
+
+*   **특징:** 개별 객체(Instance)를 구분하지 않음. 예를 들어, 소 두 마리가 붙어 있으면 이를 구분하지 않고 통째로 '소(Cow)' 픽셀 덩어리로 인식함.
+
+### 1-1. 접근법 1: Sliding Window (슬라이딩 윈도우)
+
+*   **방식:** 이미지를 작은 패치(Patch) 단위로 자르고, 각 패치를 분류 문제로 풂. 패치의 중앙 픽셀의 클래스를 결정.
+*   **문제점:** 계산 비용이 매우 비쌈. 인접한 패치들끼리 중복되는 영역이 많아 비효율적임. 실제로 거의 사용되지 않음,.
+
+### 1-2. 접근법 2: Fully Convolutional Networks
+
+*   **방식:** 완전 연결 계층(FC Layer) 없이 오직 컨볼루션 레이어만 쌓아서 구성. 입력 크기를 유지하며(padding 등 활용) 픽셀별 분류 스코어 맵을 출력.
+*   **문제점:** 입력 이미지 해상도(Resolution)를 계속 유지하며 깊은 층을 통과시키면 메모리와 계산 비용이 감당할 수 없을 정도로 커짐,.
+
+### 1-3. 접근법 3: Downsampling & Upsampling
+
+: 현재 표준적으로 사용되는 구조.
+
+1.  **Downsampling:** Stride Convolution이나 Pooling을 통해 특징 맵의 해상도를 줄이면서 깊은 특징(Feature)을 추출 (계산 효율성 확보).
+2.  **Upsampling:** 줄어든 해상도를 다시 원본 이미지 크기로 키워서 픽셀별 예측 수행,.
+
+#### 1-3-1. Upsampling 기법들
+
+네트워크 내부에서 해상도를 다시 키우는 방법들.
+
+*   **Nearest Neighbor:** 가장 단순한 방식. 픽셀 값을 복사해서 채움.
+*   **Bed of Nails:** 특정 위치에만 값을 넣고 나머지는 0으로 채움.
+*   **Max Unpooling:** Max Pooling의 역연산. Downsampling 때 Max Pooling이 수행된 **인덱스(위치 정보)를 기억**해 두었다가, Upsampling 때 해당 위치로 값을 복원하고 나머지는 0으로 채움. 공간적 정보 손실을 줄이는 데 효과적,.
+
+#### 1-3-2. Transpose Convolution (전치 컨볼루션)
+
+: 학습 가능한 Upsampling 방식 (Learnable Upsampling).
+
+![image.png](/images/ch11/ch11_02.png)
+
+*   **작동 원리:**
+    *   일반적인 컨볼루션(Stride > 1)이 입력의 다수 픽셀을 하나의 값으로 압축(내적)한다면,
+    *   Transpose Convolution은 입력의 **하나의 값**을 가져와서 필터 가중치를 곱해 **출력 영역에 뿌려주는(Broadcast)** 방식.
+    *   출력 영역에서 겹치는 부분(Overlaps)은 값을 **더해줌(Sum)**,.
+*   **용어 정리:** Deconvolution(수학적으로 틀린 용어지만 자주 쓰임), Upconvolution, Fractionally strided convolution 등으로 불리기도 함.
+*   **행렬 연산 관점:** 일반 컨볼루션을 행렬 곱으로 표현했을 때의 가중치 행렬 $W$를 **전치(Transpose, $W^T$)**하여 곱하는 연산과 같음,.
+
+## 2. Classification + Localization
+
+: 이미지 내에 **단 하나의 객체**가 있다고 가정하고, 그 객체의 클래스를 분류함과 동시에 위치(Bounding Box)를 찾는 작업.
+
+### 2-1. 구조 및 학습
+
+*   **구조:** 기본 Classification 모델(예: AlexNet, VGG)의 마지막 FC Layer 뒤에 두 개의 헤드(Head)를 붙임.
+    1.  **Class Scores:** Softmax를 통한 분류 점수.
+    2.  **Box Coordinates:** Bounding Box의 좌표(x, y, w, h)를 예측하는 4개의 숫자,.
+*   **Loss Function (Multitask Loss):**
+    *   $L = L_{cls} + \alpha L_{box}$
+    *   분류 손실(Softmax)과 회귀 손실(L2, L1 등)을 가중치 합으로 결합하여 동시에 학습. 이 하이퍼파라미터 $\alpha$를 조절하는 것이 까다로울 수 있음,.
+*   **응용 (Human Pose Estimation):** 사람의 관절 위치(예: 14개 관절)를 예측하는 문제도 동일한 방식으로(고정된 개수의 점을 회귀 예측) 접근 가능,.
+
+## 3. Object Detection (객체 탐지)
+
+: 이미지 내에 **여러 개의 객체**가 존재하며, 각 객체의 클래스와 위치를 모두 찾아야 함. 객체의 수가 이미지마다 다르기 때문에 단순 회귀(Regression)로 풀기 어려움.
+
+![image.png](/images/ch11/ch11_03.png)
+
+### 3-1. Sliding Window (Not feasible)
+
+*   이미지의 모든 위치와 다양한 크기(Scale), 비율(Aspect Ratio)에 대해 부분 이미지를 잘라내어 CNN에 넣는 방식.
+*   경우의 수가 너무 많아 계산이 불가능함,.
+
+### 3-2. Region Proposals (영역 추정)
+
+*   **아이디어:** 딥러닝 이전에 존재하던 컴퓨터 비전 기술(예: Selective Search)을 활용해, 객체가 있을 법한 "Blobby"한 영역 약 2,000개를 빠르게 찾아냄.
+*   정확도는 낮아도 재현율(Recall)이 높으면 됨 (실제 객체를 놓치지 않는 것이 중요),.
+
+### 3-3. R-CNN (Regions with CNN features)
+
+: 2014년 등장, 딥러닝 기반 객체 탐지의 시초.
+
+1.  **Region Proposal:** 입력 이미지에서 약 2,000개의 관심 영역(ROI) 추출.
+2.  **Warp:** 각 영역을 CNN 입력 크기에 맞춰 강제로 리사이징(Warp).
+3.  **CNN:** 각 영역을 개별적으로 CNN에 통과시켜 특징 추출.
+4.  **Classify & Regress:** 추출된 특징으로 SVM 분류 및 Bounding Box 보정(Offset 예측) 수행,.
+
+*   **문제점:** 속도가 매우 느림 (학습 및 테스트 모두). 2,000개의 영역 각각에 대해 CNN을 돌려야 함,.
+
+### 3-4. Fast R-CNN
+
+: R-CNN의 속도 문제를 해결.
+
+1.  **ConvNet 공유:** 이미지를 **한 번만** CNN에 통과시켜 전체 이미지에 대한 고해상도 특징 맵(Feature Map)을 얻음.
+2.  **Projection:** Region Proposal 위치를 특징 맵 상의 좌표로 투영.
+3.  **ROI Pooling:** 투영된 영역에서 필요한 특징을 추출하고 고정된 크기로 변환 (미분 가능).
+4.  **FC Layers:** 이후 분류 및 박스 회귀 수행.
+
+*   **장점:** 특징 추출 연산을 공유하므로 R-CNN 대비 학습 10배, 추론 속도가 매우 빨라짐. 하지만 **Region Proposal 단계가 병목**으로 남음 (외부 알고리즘 사용),.
+
+### 3-5. Faster R-CNN
+
+: Region Proposal 단계까지 네트워크 내부로 통합.
+
+*   **Region Proposal Network (RPN):** CNN 특징 맵 위에서 객체가 있을 법한 위치를 예측하는 별도의 네트워크를 학습.
+*   **Anchor Boxes:** 미리 정의된 다양한 비율/크기의 박스(Anchor)를 기준으로 객체 유무와 위치 보정을 예측.
+*   **구조:** [입력 -> ConvNet -> **RPN** -> ROI Pooling -> Classifier/Regressor].
+*   **결과:** 모든 과정이 GPU 상에서 돌아가며 거의 실시간(Real-time)에 가까운 속도 달성,.
+
+### 3-6. Single Shot Detection (YOLO / SSD)
+
+: Region Proposal 과정 없이 한 번의 전파(Single Pass)로 탐지 수행.
+
+*   **방식:** 이미지를 그리드(Grid)로 나누고, 각 그리드 셀마다 미리 정의된 베이스 박스(Base Bounding Box)들을 기준으로 클래스와 위치 오프셋을 동시에 예측.
+*   **특징:** Faster R-CNN보다 속도는 빠르지만, 작은 객체 탐지 등 정확도는 다소 떨어질 수 있음 (최근에는 성능 격차가 많이 줄어듦),.
+
+## 4. Instance Segmentation (인스턴스 세그멘테이션)
+
+: Object Detection과 Semantic Segmentation의 결합. 개별 객체를 탐지하고, 그 객체의 픽셀 단위 마스크(Mask)까지 추출.
+
+### 4-1. Mask R-CNN
+
+: Faster R-CNN을 확장한 모델.
+
+![image.png](/images/ch11/ch11_04.png)
+
+*   **구조:** Faster R-CNN의 구조(Classification + Box Regression)에 **마스크 예측을 위한 세 번째 브랜치(Branch)**를 병렬로 추가.
+*   **ROI Align:** ROI Pooling 과정에서 소수점 좌표를 버림(Quantization)으로써 발생하는 미세한 위치 오차를 해결하기 위해, 보간법(Interpolation)을 사용하는 ROI Align 도입. 이를 통해 픽셀 단위의 정교한 마스크 생성이 가능해짐.
+*   **확장성:** 마스크 브랜치 대신 관절(Keypoint) 예측 브랜치를 붙이면 사람의 자세(Pose Estimation)도 아주 잘 추정함,.
